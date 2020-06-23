@@ -1,0 +1,173 @@
+
+val lines = sc.textFile("heart_diseases/processed.cleveland.data")
+
+val rows = lines.map(x => x.replaceAll("[?]","999999.0"))
+
+val tokens = rows.map(x => x.split(","))
+
+val arr1 = tokens.map(x => x.toSeq.map(y => y.toDouble))
+
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+
+val data = arr1.map( x => {
+  val arr = x.toArray
+  val arr_size = arr.size
+  val l = arr(arr_size-1)
+  val f = Vectors.dense(arr.slice(0,arr_size-2))
+  LabeledPoint(l,f)
+})
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val adultTrain = sets(0)
+val adultTest = sets(1)
+
+import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+val alg = new LinearRegressionWithSGD()
+alg.setIntercept(true)
+alg.optimizer.setNumIterations(200)
+alg.optimizer.setStepSize(0.0000000009)
+val model = alg.run(adultTrain)
+
+val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+
+-------------------------
+
+scala> arr1.map(x => (x(12),1)).reduceByKey(_+_).take(10)
+res6: Array[(Double, Int)] = Array((6.0,18), (7.0,117), (3.0,166), (999999.0,2))
+
+scala> arr1.map(x => (x(11),1)).reduceByKey(_+_).take(10)
+res10: Array[(Double, Int)] = Array((2.0,38), (0.0,176), (3.0,20), (1.0,65), (999999.0,4))
+
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+
+val data = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  val l = arr(arr_size-1)
+  val f = Vectors.dense(arr.slice(0,arr_size-2))
+  LabeledPoint(l,f)
+})
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val adultTrain = sets(0)
+val adultTest = sets(1)
+
+import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+val alg = new LinearRegressionWithSGD()
+alg.setIntercept(true)
+alg.optimizer.setNumIterations(200)
+alg.optimizer.setStepSize(0.0000000009)
+val model = alg.run(adultTrain)
+
+val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+
+import org.apache.spark.mllib.evaluation.RegressionMetrics
+val validMetrics = new RegressionMetrics(validPredicts)
+validMetrics.rootMeanSquaredError
+validMetrics.meanSquaredError
+
+-----------------------------------
+
+import org.apache.spark.mllib.linalg.Vectors
+
+val vectors = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  Vectors.dense(arr.slice(0,arr_size-2))
+})
+vectors.cache
+
+import org.apache.spark.mllib.feature.StandardScaler
+val scaler = new StandardScaler(withMean = true, withStd = false).fit(vectors)
+val scaledVectors = vectors.map(v => scaler.transform(v))
+
+val vect = arr1.map( x => x(x.size-1)).zip(scaledVectors)
+
+import org.apache.spark.mllib.regression.LabeledPoint
+val data = vect.map( x => LabeledPoint(x._1,x._2))
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val adultTrain = sets(0)
+val adultTest = sets(1)
+
+import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+val alg = new LinearRegressionWithSGD()
+alg.setIntercept(true)
+alg.optimizer.setNumIterations(200)
+alg.optimizer.setStepSize(0.0000000009)
+val model = alg.run(adultTrain)
+
+val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+validPredicts.take(10)
+
+import org.apache.spark.mllib.linalg.Matrix
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
+val matrix = new RowMatrix(vectors)
+val matrixSummary = matrix.computeColumnSummaryStatistics()
+
+println(matrixSummary.mean)
+println(matrixSummary.max)
+println(matrixSummary.min)
+
+-------------------------
+
+import org.apache.spark.mllib.linalg.Matrix
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
+val matrix = new RowMatrix(vectors)
+val colsims = matrix.columnSimilarities()
+val mat1 = colsims.toRowMatrix
+
+mat1.computeCovariance
+mat1.columnSimilarities
+
+---------------------------
+
+import org.apache.spark.mllib.linalg.Vectors
+
+val vectors = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  Vectors.dense(arr.slice(0,arr_size-2))
+})
+vectors.cache
+
+val vect = arr1.map( x => {
+  x(x.size-1) match {
+    case 0 => 0
+    case 1 | 2 => 1
+    case 3 | 4 => 2
+  }
+}).zip(vectors)
+
+import org.apache.spark.mllib.regression.LabeledPoint
+val data = vect.map( x => LabeledPoint(x._1,x._2))
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val adultTrain = sets(0)
+val adultTest = sets(1)
+
+
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+val numIterations = 100
+val model = new LogisticRegressionWithLBFGS().setNumClasses(3).run(adultTrain)
+
+val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
+val metrics = new MulticlassMetrics(validPredicts)
+val accuracy = metrics.accuracy
+println(s"Accuracy = $accuracy")
+
+
