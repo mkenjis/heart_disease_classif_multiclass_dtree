@@ -20,17 +20,17 @@ val data = arr1.map( x => {
 
 val split_seed = 12345
 val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val adultTrain = sets(0)
-val adultTest = sets(1)
+val trainSet = sets(0)
+val testSet = sets(1)
 
 import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 val alg = new LinearRegressionWithSGD()
 alg.setIntercept(true)
 alg.optimizer.setNumIterations(200)
 alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(adultTrain)
+val model = alg.run(trainSet)
 
-val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
 -------------------------
 
@@ -55,17 +55,17 @@ val data = arr1.map( x => {
 
 val split_seed = 12345
 val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val adultTrain = sets(0)
-val adultTest = sets(1)
+val trainSet = sets(0)
+val testSet = sets(1)
 
 import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 val alg = new LinearRegressionWithSGD()
 alg.setIntercept(true)
 alg.optimizer.setNumIterations(200)
 alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(adultTrain)
+val model = alg.run(trainSet)
 
-val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 val validMetrics = new RegressionMetrics(validPredicts)
@@ -96,17 +96,17 @@ val data = vect.map( x => LabeledPoint(x._1,x._2))
 
 val split_seed = 12345
 val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val adultTrain = sets(0)
-val adultTest = sets(1)
+val trainSet = sets(0)
+val testSet = sets(1)
 
 import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 val alg = new LinearRegressionWithSGD()
 alg.setIntercept(true)
 alg.optimizer.setNumIterations(200)
 alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(adultTrain)
+val model = alg.run(trainSet)
 
-val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 validPredicts.take(10)
 
 import org.apache.spark.mllib.linalg.Matrix
@@ -155,15 +155,15 @@ val data = vect.map( x => LabeledPoint(x._1,x._2))
 
 val split_seed = 12345
 val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val adultTrain = sets(0)
-val adultTest = sets(1)
+val trainSet = sets(0)
+val testSet = sets(1)
 
 
 import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
 val numIterations = 100
-val model = new LogisticRegressionWithLBFGS().setNumClasses(3).run(adultTrain)
+val model = new LogisticRegressionWithLBFGS().setNumClasses(3).run(trainSet)
 
-val validPredicts = adultTest.map(x => (model.predict(x.features),x.label))
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 val metrics = new MulticlassMetrics(validPredicts)
