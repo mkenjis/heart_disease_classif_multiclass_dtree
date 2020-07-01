@@ -1,14 +1,14 @@
 # heart_disease_multiclass
 heart disease multiclass classification
 
-Purpose: 
+# Purpose: 
 - use heart disease dataset to train different MLlib classification regression models.
 - use trained model to identify which cases are identified as critical.
 		 
-Requirements: 
+# Requirements: 
 - Spark installed
 
-Objetive:
+# Objetive:
 - perform steps to extract features and label and submit to different MLlib classification models.
 - use different parameters and transformations on data to identify a good model.
 - compare the performance among different MLlib classification models.
