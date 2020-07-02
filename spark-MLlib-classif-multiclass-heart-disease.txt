@@ -32,6 +32,9 @@ val model = alg.run(trainSet)
 
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
+validPredicts.take(10)
+// res3: Array[(Double, Double)] = Array((1.0000103905010727,0.0), (1.0000113245157163,0.0), (1.0000149385423593,0.0), (1.0001419096900948,2.0), (1.0000098961819015,0.0), (1.0000107622405836,1.0), (1.0000117865453069,0.0), (1.0000102656396572,0.0), (1.0002709266364722,3.0), (1.0000113355609694,0.0))
+
 -------------------------
 
 scala> arr1.map(x => (x(12),1)).reduceByKey(_+_).take(10)
@@ -72,7 +75,45 @@ val validMetrics = new RegressionMetrics(validPredicts)
 validMetrics.rootMeanSquaredError
 validMetrics.meanSquaredError
 
+validPredicts.take(10)
+// res11: Array[(Double, Double)] = Array((0.9999966877136124,0.0), (0.9999965238308652,0.0), (0.9999966214361937,0.0), (0.9999971569814474,2.0), (0.9999968051986142,0.0), (0.9999966883745098,1.0), (0.9999969262004659,0.0), (0.9999972379258951,0.0), (0.9999966867896387,3.0), (0.9999965591329841,0.0))
+
 -----------------------------------
+
+import org.apache.spark.mllib.linalg.Vectors
+
+val data = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  val l = arr(arr_size-1)
+  val f = Vectors.dense(arr.slice(0,arr_size-2))
+  LabeledPoint(l,f)
+})
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val trainSet = sets(0)
+val testSet = sets(1)
+
+import org.apache.spark.mllib.feature.StandardScaler
+val scaler = new StandardScaler(true, false).fit(trainSet.map(x => x.features))
+ 
+val trainScaled = trainSet.map(x => LabeledPoint(x.label,scaler.transform(x.features)))
+val validScaled = testSet.map(x => LabeledPoint(x.label, scaler.transform(x.features)))
+
+import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+val alg = new LinearRegressionWithSGD()
+alg.setIntercept(true)
+alg.optimizer.setNumIterations(200)
+alg.optimizer.setStepSize(0.0000000009)
+val model = alg.run(trainScaled)
+
+val validPredicts = validScaled.map(x => (model.predict(x.features),x.label))
+validPredicts.take(10)
+
+-------------------------
 
 import org.apache.spark.mllib.linalg.Vectors
 
@@ -84,30 +125,6 @@ val vectors = arr1.map( x => {
   Vectors.dense(arr.slice(0,arr_size-2))
 })
 vectors.cache
-
-import org.apache.spark.mllib.feature.StandardScaler
-val scaler = new StandardScaler(withMean = true, withStd = false).fit(vectors)
-val scaledVectors = vectors.map(v => scaler.transform(v))
-
-val vect = arr1.map( x => x(x.size-1)).zip(scaledVectors)
-
-import org.apache.spark.mllib.regression.LabeledPoint
-val data = vect.map( x => LabeledPoint(x._1,x._2))
-
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val trainSet = sets(0)
-val testSet = sets(1)
-
-import org.apache.spark.mllib.regression.LinearRegressionWithSGD
-val alg = new LinearRegressionWithSGD()
-alg.setIntercept(true)
-alg.optimizer.setNumIterations(200)
-alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(trainSet)
-
-val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
-validPredicts.take(10)
 
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
@@ -122,12 +139,38 @@ println(matrixSummary.min)
 
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
+
 val matrix = new RowMatrix(vectors)
+
 val colsims = matrix.columnSimilarities()
 val mat1 = colsims.toRowMatrix
 
-mat1.computeCovariance
-mat1.columnSimilarities
+import org.apache.spark.mllib.linalg.distributed.MatrixEntry
+val transformedRDD = colsims.entries.map{case MatrixEntry(row: Long, col:Long, sim:Double) => ((row,col),sim)}
+
+val rep = transformedRDD.sortBy(_._1).map(x => ((x._1._1,x._1._2),x._2))
+
+var i = -1.0
+
+rep.foreach( x => {
+  val sim = x._2
+  if (x._1._1 != i) { println
+    print(f"$sim%.4f ")
+    i = x._1._1
+  } else print(f"$sim%.4f ")
+})
+
+0.8044 0.9490 0.9840 0.9726 0.3981 0.7137 0.9655 0.5762 0.6835 0.9304 0.6204
+0.7907 0.8125 0.7838 0.3427 0.5908 0.8109 0.5392 0.5936 0.7773 0.5175
+0.9471 0.9409 0.3581 0.6894 0.9313 0.6385 0.6826 0.9090 0.6097
+0.9737 0.4034 0.7135 0.9790 0.5736 0.6804 0.9308 0.5850
+0.3790 0.7158 0.9674 0.5698 0.6606 0.9133 0.5879
+0.3175 0.3799 0.2397 0.2613 0.3795 0.3292
+0.6890 0.4528 0.5315 0.6930 0.4852
+0.5182 0.6215 0.9019 0.5402
+0.5577 0.6094 0.4288
+0.7775 0.5696
+0.5734
 
 ---------------------------
 
