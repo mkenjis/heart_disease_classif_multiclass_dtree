@@ -14,8 +14,8 @@ val data = arr1.map( x => {
   val arr = x.toArray
   val arr_size = arr.size
   val l = arr(arr_size-1)
-  val f = Vectors.dense(arr.slice(0,arr_size-2))
-  LabeledPoint(l,f)
+  val f = arr.slice(0,arr_size-1)
+  LabeledPoint(l,Vectors.dense(f))
 })
 
 val split_seed = 12345
@@ -29,18 +29,18 @@ alg.setIntercept(true)
 alg.optimizer.setNumIterations(200)
 alg.optimizer.setStepSize(0.0000000009)
 val model = alg.run(trainSet)
+model: intercept = 1.0000000001370606, numFeatures = 13
 
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
 validPredicts.take(10)
-// res3: Array[(Double, Double)] = Array((1.0000103905010727,0.0), (1.0000113245157163,0.0), (1.0000149385423593,0.0), (1.0001419096900948,2.0), (1.0000098961819015,0.0), (1.0000107622405836,1.0), (1.0000117865453069,0.0), (1.0000102656396572,0.0), (1.0002709266364722,3.0), (1.0000113355609694,0.0))
-
+res6: Array[(Double, Double)] = Array((1.0000103785684915,0.0), (1.0000113125381451,0.0), (1.00001492641901,0.0), (1.0001418825184034,2.0), (1.0000098842741663,0.0), (1.0000107351057705,1.0), (1.0000117745635608,0.0), (1.0000102537305788,0.0), (1.000270899482536,3.0), (1.0000113235851147,0.0))
 -------------------------
 
-scala> arr1.map(x => (x(12),1)).reduceByKey(_+_).take(10)
+arr1.map(x => (x(12),1)).reduceByKey(_+_).take(10)
 res6: Array[(Double, Int)] = Array((6.0,18), (7.0,117), (3.0,166), (999999.0,2))
 
-scala> arr1.map(x => (x(11),1)).reduceByKey(_+_).take(10)
+arr1.map(x => (x(11),1)).reduceByKey(_+_).take(10)
 res10: Array[(Double, Int)] = Array((2.0,38), (0.0,176), (3.0,20), (1.0,65), (999999.0,4))
 
 import org.apache.spark.mllib.linalg.Vectors
@@ -52,8 +52,8 @@ val data = arr1.map( x => {
   arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
   val arr_size = arr.size
   val l = arr(arr_size-1)
-  val f = Vectors.dense(arr.slice(0,arr_size-2))
-  LabeledPoint(l,f)
+  val f = arr.slice(0,arr_size-1)
+  LabeledPoint(l,Vectors.dense(f))
 })
 
 val split_seed = 12345
@@ -70,17 +70,46 @@ val model = alg.run(trainSet)
 
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
+validPredicts.take(10)
+res13: Array[(Double, Double)] = Array((0.9999966931880765,0.0), (0.999996529305302,0.0), (0.999996626910541,0.0), (0.9999971697555841,2.0), (0.9999968106730951,0.0), (0.9999967011486682,1.0), (0.9999969316749004,0.0), (0.9999972434003718,0.0), (0.9999966995637872,3.0), (0.9999965646074228,0.0))
+
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 val validMetrics = new RegressionMetrics(validPredicts)
-validMetrics.rootMeanSquaredError
-validMetrics.meanSquaredError
+validMetrics.rootMeanSquaredError  // 1.2064634209661982
+validMetrics.meanSquaredError      // 1.4555539861294622
 
-validPredicts.take(10)
-// res11: Array[(Double, Double)] = Array((0.9999966877136124,0.0), (0.9999965238308652,0.0), (0.9999966214361937,0.0), (0.9999971569814474,2.0), (0.9999968051986142,0.0), (0.9999966883745098,1.0), (0.9999969262004659,0.0), (0.9999972379258951,0.0), (0.9999966867896387,3.0), (0.9999965591329841,0.0))
+-------------------------
+
+import org.apache.spark.mllib.linalg.Vectors
+
+val vectors = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  Vectors.dense(arr.slice(0,arr_size-1))
+})
+vectors.cache
+
+import org.apache.spark.mllib.linalg.Matrix
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
+val matrix = new RowMatrix(vectors)
+val matrixSummary = matrix.computeColumnSummaryStatistics()
+
+println(matrixSummary.mean)
+[54.43894389438945,0.6798679867986799,3.158415841584159,131.68976897689765,246.69306930693077,0.1485148514851485,0.9900990099009899,149.6072607260726,0.32673267326732675,1.0396039603960399,1.6006600660065995,0.6633663366336632,4.722772277227725]
+
+println(matrixSummary.max)
+[77.0,1.0,4.0,200.0,564.0,1.0,2.0,202.0,1.0,6.2,3.0,3.0,7.0]
+
+println(matrixSummary.min)
+[29.0,0.0,1.0,94.0,126.0,0.0,0.0,71.0,0.0,0.0,1.0,0.0,3.0]
+
 
 -----------------------------------
 
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
 
 val data = arr1.map( x => {
   val arr = x.toArray
@@ -88,8 +117,8 @@ val data = arr1.map( x => {
   arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
   val arr_size = arr.size
   val l = arr(arr_size-1)
-  val f = Vectors.dense(arr.slice(0,arr_size-2))
-  LabeledPoint(l,f)
+  val f = arr.slice(0,arr_size-1)
+  LabeledPoint(l,Vectors.dense(f))
 })
 
 val split_seed = 12345
@@ -111,7 +140,14 @@ alg.optimizer.setStepSize(0.0000000009)
 val model = alg.run(trainScaled)
 
 val validPredicts = validScaled.map(x => (model.predict(x.features),x.label))
+
 validPredicts.take(10)
+res4: Array[(Double, Double)] = Array((0.9999994397819242,0.0), (0.9999993960891147,0.0), (0.9999998853368604,0.0), (1.000000059691792,2.0), (0.9999994832746449,0.0), (0.9999994964108773,1.0), (0.999999807359352,0.0), (0.9999999350185899,0.0), (0.999999537514156,3.0), (0.9999994228067791,0.0))
+
+import org.apache.spark.mllib.evaluation.RegressionMetrics
+val validMetrics = new RegressionMetrics(validPredicts)
+validMetrics.rootMeanSquaredError  // 1.2064638449702823
+validMetrics.meanSquaredError      // 1.455555009220477
 
 -------------------------
 
@@ -122,20 +158,9 @@ val vectors = arr1.map( x => {
   arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
   arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
   val arr_size = arr.size
-  Vectors.dense(arr.slice(0,arr_size-2))
+  Vectors.dense(arr.slice(0,arr_size))
 })
 vectors.cache
-
-import org.apache.spark.mllib.linalg.Matrix
-import org.apache.spark.mllib.linalg.distributed.RowMatrix
-val matrix = new RowMatrix(vectors)
-val matrixSummary = matrix.computeColumnSummaryStatistics()
-
-println(matrixSummary.mean)
-println(matrixSummary.max)
-println(matrixSummary.min)
-
--------------------------
 
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
@@ -160,17 +185,19 @@ rep.foreach( x => {
   } else print(f"$sim%.4f ")
 })
 
-0.8044 0.9490 0.9840 0.9726 0.3981 0.7137 0.9655 0.5762 0.6835 0.9304 0.6204
-0.7907 0.8125 0.7838 0.3427 0.5908 0.8109 0.5392 0.5936 0.7773 0.5175
-0.9471 0.9409 0.3581 0.6894 0.9313 0.6385 0.6826 0.9090 0.6097
-0.9737 0.4034 0.7135 0.9790 0.5736 0.6804 0.9308 0.5850
-0.3790 0.7158 0.9674 0.5698 0.6606 0.9133 0.5879
-0.3175 0.3799 0.2397 0.2613 0.3795 0.3292
-0.6890 0.4528 0.5315 0.6930 0.4852
-0.5182 0.6215 0.9019 0.5402
-0.5577 0.6094 0.4288
-0.7775 0.5696
-0.5734
+0.8044 0.9490 0.9840 0.9726 0.3981 0.7137 0.9655 0.5762 0.6835 0.9304 0.6204 0.9208 0.6280  num x age
+       0.7907 0.8125 0.7838 0.3427 0.5908 0.8109 0.5392 0.5936 0.7773 0.5175 0.8446 0.6016  num x sex
+              0.9471 0.9409 0.3581 0.6894 0.9313 0.6385 0.6826 0.9090 0.6097 0.9143 0.6750  num x cp
+                     0.9737 0.4034 0.7135 0.9790 0.5736 0.6804 0.9308 0.5850 0.9239 0.6184  num x trestbps
+                            0.3790 0.7158 0.9674 0.5698 0.6606 0.9133 0.5879 0.9071 0.6058  num x chol
+                                   0.3175 0.3799 0.2397 0.2613 0.3795 0.3292 0.3792 0.2774  num x fbs
+                                          0.6890 0.4528 0.5315 0.6930 0.4852 0.6598 0.5320  num x restecg
+                                                 0.5182 0.6215 0.9019 0.5402 0.8991 0.5505  num x thalach
+                                                        0.5577 0.6094 0.4288 0.6301 0.6059  num x exang
+                                                               0.7775 0.5696 0.7145 0.7036  num x oldpeak
+                                                                      0.5734 0.9027 0.6745  num x slope
+                                                                             0.6152 0.6892  num x ca
+                                                                                    0.7146  num x thal
 
 ---------------------------
 
@@ -181,7 +208,7 @@ val vectors = arr1.map( x => {
   arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
   arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
   val arr_size = arr.size
-  Vectors.dense(arr.slice(0,arr_size-2))
+  Vectors.dense(arr.slice(0,arr_size-1))
 })
 vectors.cache
 
@@ -201,15 +228,19 @@ val sets = data.randomSplit(Array(0.7,0.3),split_seed)
 val trainSet = sets(0)
 val testSet = sets(1)
 
-
 import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
 val numIterations = 100
 val model = new LogisticRegressionWithLBFGS().setNumClasses(3).run(trainSet)
 
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
+validPredicts.take(20)
+res30: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,1.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (2.0,2.0), (0.0,0.0), (0.0,0.0), (1.0,1.0), (0.0,1.0), (0.0,1.0), (1.0,1.0), (0.0,0.0), (1.0,1.0), (0.0,1.0))
+
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 val metrics = new MulticlassMetrics(validPredicts)
+validPredicts.filter(x => x._1 == x._2).count  // 62
+validPredicts.count                            // 90
 val accuracy = metrics.accuracy
 println(s"Accuracy = $accuracy")
 
