@@ -202,6 +202,64 @@ rep.foreach( x => {
 ---------------------------
 
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+
+val data = arr1.map( x => {
+  val arr = x.toArray
+  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
+  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
+  val arr_size = arr.size
+  val l = arr(arr_size-1)
+  val f = arr.slice(0,arr_size-1)
+  LabeledPoint(l,Vectors.dense(f))
+})
+
+val split_seed = 12345
+val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+val trainSet = sets(0)
+val testSet = sets(1)
+
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+val numIterations = 100
+val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainSet)
+
+val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
+
+validPredicts.take(20)
+res0: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,1.0), (0.0,1.0), (3.0,2.0), (0.0,0.0), (2.0,1.0), (0.0,1.0))
+
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
+val metrics = new MulticlassMetrics(validPredicts)
+validPredicts.filter(x => x._1 == x._2).count  // 55
+validPredicts.count                            // 90
+val accuracy = metrics.accuracy   // 0.6111111111111112
+
+---------------------------
+
+import org.apache.spark.mllib.feature.StandardScaler
+val scaler = new StandardScaler(true, false).fit(trainSet.map(x => x.features))
+ 
+val trainScaled = trainSet.map(x => LabeledPoint(x.label,scaler.transform(x.features)))
+val validScaled = testSet.map(x => LabeledPoint(x.label, scaler.transform(x.features)))
+
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+val numIterations = 100
+val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainScaled)
+
+val validPredicts = validScaled.map(x => (model.predict(x.features),x.label))
+
+validPredicts.take(20)
+res8: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (4.0,1.0), (0.0,1.0), (1.0,2.0), (0.0,0.0), (2.0,1.0), (0.0,1.0))
+
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
+val metrics = new MulticlassMetrics(validPredicts)
+validPredicts.filter(x => x._1 == x._2).count  // 50
+validPredicts.count                            // 90
+val accuracy = metrics.accuracy   // 0.5555555555555556
+
+---------------------------
+
+import org.apache.spark.mllib.linalg.Vectors
 
 val vectors = arr1.map( x => {
   val arr = x.toArray
@@ -241,7 +299,4 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 val metrics = new MulticlassMetrics(validPredicts)
 validPredicts.filter(x => x._1 == x._2).count  // 62
 validPredicts.count                            // 90
-val accuracy = metrics.accuracy
-println(s"Accuracy = $accuracy")
-
-
+val accuracy = metrics.accuracy   // 0.6888888888888889
