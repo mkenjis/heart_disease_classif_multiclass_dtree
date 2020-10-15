@@ -1,169 +1,154 @@
+---- Feature extraction & Data Munging --------------
 
-val lines = sc.textFile("heart_diseases/processed.cleveland.data")
+val rdd = sc.textFile("heart_diseases/processed.cleveland.data").map( x => x.split(","))
 
-val rows = lines.map(x => x.replaceAll("[?]","999999.0"))
+rdd.map(x => (x(12),1)).reduceByKey(_+_).take(10)
+res0: Array[(String, Int)] = Array((7.0,117), (6.0,18), (3.0,166), (?,2))
 
-val tokens = rows.map(x => x.split(","))
+rdd.map(x => (x(11),1)).reduceByKey(_+_).take(10)
+res1: Array[(String, Int)] = Array((1.0,65), (3.0,20), (?,4), (0.0,176), (2.0,38))
 
-val arr1 = tokens.map(x => x.toSeq.map(y => y.toDouble))
+---- needs to replace "?" with most frequent value in the respective field
+val rdd1 = rdd.map( x => {
+   val arr = x
+   arr(12) = if (arr(12) == "?") "3.0" else arr(12)
+   arr(11) = if (arr(11) == "?") "0.0" else arr(11)
+   arr
+ })
 
+rdd1.take(10)
+res4: Array[Array[String]] = Array(Array(63.0, 1.0, 1.0, 145.0, 233.0, 1.0, 2.0, 150.0, 0.0, 2.3, 3.0, 0.0, 6.0, 0), Array(67.0, 1.0, 4.0, 160.0, 286.0, 0.0, 2.0, 108.0, 1.0, 1.5, 2.0, 3.0, 3.0, 2), Array(67.0, 1.0, 4.0, 120.0, 229.0, 0.0, 2.0, 129.0, 1.0, 2.6, 2.0, 2.0, 7.0, 1), Array(37.0, 1.0, 3.0, 130.0, 250.0, 0.0, 0.0, 187.0, 0.0, 3.5, 3.0, 0.0, 3.0, 0), Array(41.0, 0.0, 2.0, 130.0, 204.0, 0.0, 2.0, 172.0, 0.0, 1.4, 1.0, 0.0, 3.0, 0))
+
+val rdd2 = rdd1.map( x => x.map( y => y.toDouble ))
+
+rdd2.take(10)
+res5: Array[Array[Double]] = Array(Array(63.0, 1.0, 1.0, 145.0, 233.0, 1.0, 2.0, 150.0, 0.0, 2.3, 3.0, 0.0, 6.0, 0.0), Array(67.0, 1.0, 4.0, 160.0, 286.0, 0.0, 2.0, 108.0, 1.0, 1.5, 2.0, 3.0, 3.0, 2.0), Array(67.0, 1.0, 4.0, 120.0, 229.0, 0.0, 2.0, 129.0, 1.0, 2.6, 2.0, 2.0, 7.0, 1.0), Array(37.0, 1.0, 3.0, 130.0, 250.0, 0.0, 0.0, 187.0, 0.0, 3.5, 3.0, 0.0, 3.0, 0.0), Array(41.0, 0.0, 2.0, 130.0, 204.0, 0.0, 2.0, 172.0, 0.0, 1.4, 1.0, 0.0, 3.0, 0.0))
+
+---- load data to LabeledPoint
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 
-val data = arr1.map( x => {
-  val arr = x.toArray
-  val arr_size = arr.size
-  val l = arr(arr_size-1)
-  val f = arr.slice(0,arr_size-1)
+val data = rdd2.map( x => {
+  val arr_size = x.size - 1
+  val l = x(arr_size)
+  val f = x.slice(0,arr_size)
   LabeledPoint(l,Vectors.dense(f))
 })
 
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
+data.take(10)
+res20: Array[org.apache.spark.mllib.regression.LabeledPoint] = Array((0.0,[63.0,1.0,1.0,145.0,233.0,1.0,2.0,150.0,0.0,2.3,3.0,0.0,6.0]), (2.0,[67.0,1.0,4.0,160.0,286.0,0.0,2.0,108.0,1.0,1.5,2.0,3.0,3.0]), (1.0,[67.0,1.0,4.0,120.0,229.0,0.0,2.0,129.0,1.0,2.6,2.0,2.0,7.0]), (0.0,[37.0,1.0,3.0,130.0,250.0,0.0,0.0,187.0,0.0,3.5,3.0,0.0,3.0]), (0.0,[41.0,0.0,2.0,130.0,204.0,0.0,2.0,172.0,0.0,1.4,1.0,0.0,3.0]), (0.0,[56.0,1.0,2.0,120.0,236.0,0.0,0.0,178.0,0.0,0.8,1.0,0.0,3.0]), (3.0,[62.0,0.0,4.0,140.0,268.0,0.0,2.0,160.0,0.0,3.6,3.0,2.0,3.0]), (0.0,[57.0,0.0,4.0,120.0,354.0,0.0,0.0,163.0,1.0,0.6,1.0,0.0,3.0]), (2.0,[63.0,1.0,4.0,130.0,254.0,0.0,2.0,147.0,0.0,1.4,2.0,1.0,7.0]), (1.0,[53.0,1.0,4.0,140.0,203.0,1.0,2.0,155.0,1.0,3.1,3.0,0.0,7.0]))
+
+data.map{ case LabeledPoint(x,y) => x }.distinct.take(10)
+res7: Array[Double] = Array(2.0, 0.0, 3.0, 1.0, 4.0)
+
+val sets = data.randomSplit(Array(0.7,0.3))
 val trainSet = sets(0)
 val testSet = sets(1)
 
-import org.apache.spark.mllib.regression.LinearRegressionWithSGD
-val alg = new LinearRegressionWithSGD()
-alg.setIntercept(true)
-alg.optimizer.setNumIterations(200)
-alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(trainSet)
-model: intercept = 1.0000000001370606, numFeatures = 13
+---- MLlib logistic regression --------------
+
+import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
+val numIterations = 100
+val model = LogisticRegressionWithSGD.train(trainSet, numIterations)
+ERROR DataValidators: Classification labels should be 0 or 1. Found 60 invalid labels
+
+
+---- MLlib SVM regression --------------
+
+import org.apache.spark.mllib.classification.SVMWithSGD
+val numIterations = 100
+val model = SVMWithSGD.train(trainSet, numIterations)
+ERROR DataValidators: Classification labels should be 0 or 1. Found 60 invalid labels
+
+---- MLlib Multiclass logistic regression --------------
+
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+val numIterations = 100
+val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainSet)
 
 val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
 
-validPredicts.take(10)
-res6: Array[(Double, Double)] = Array((1.0000103785684915,0.0), (1.0000113125381451,0.0), (1.00001492641901,0.0), (1.0001418825184034,2.0), (1.0000098842741663,0.0), (1.0000107351057705,1.0), (1.0000117745635608,0.0), (1.0000102537305788,0.0), (1.000270899482536,3.0), (1.0000113235851147,0.0))
--------------------------
+validPredicts.take(20)
+res21: Array[(Double, Double)] = Array((0.0,0.0), (2.0,2.0), (3.0,1.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (2.0,2.0), (0.0,1.0), (0.0,0.0), (3.0,3.0), (1.0,3.0), (0.0,0.0), (0.0,0.0))
 
-arr1.map(x => (x(12),1)).reduceByKey(_+_).take(10)
-res6: Array[(Double, Int)] = Array((6.0,18), (7.0,117), (3.0,166), (999999.0,2))
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
+val metrics = new MulticlassMetrics(validPredicts)
+validPredicts.filter(x => x._1 == x._2).count  // 55
+validPredicts.count                            // 91
+val accuracy = metrics.accuracy   // 0.5670103092783505
 
-arr1.map(x => (x(11),1)).reduceByKey(_+_).take(10)
-res10: Array[(Double, Int)] = Array((2.0,38), (0.0,176), (3.0,20), (1.0,65), (999999.0,4))
+metrics.confusionMatrix
+res37: org.apache.spark.mllib.linalg.Matrix =
+47.0  4.0  0.0  0.0  0.0
+11.0  1.0  2.0  2.0  0.0
+0.0   6.0  5.0  1.0  0.0
+2.0   3.0  4.0  2.0  2.0
+0.0   1.0  1.0  3.0  0.0
 
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
-
-val data = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  val l = arr(arr_size-1)
-  val f = arr.slice(0,arr_size-1)
-  LabeledPoint(l,Vectors.dense(f))
-})
-
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val trainSet = sets(0)
-val testSet = sets(1)
-
-import org.apache.spark.mllib.regression.LinearRegressionWithSGD
-val alg = new LinearRegressionWithSGD()
-alg.setIntercept(true)
-alg.optimizer.setNumIterations(200)
-alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(trainSet)
-
-val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
-
-validPredicts.take(10)
-res13: Array[(Double, Double)] = Array((0.9999966931880765,0.0), (0.999996529305302,0.0), (0.999996626910541,0.0), (0.9999971697555841,2.0), (0.9999968106730951,0.0), (0.9999967011486682,1.0), (0.9999969316749004,0.0), (0.9999972434003718,0.0), (0.9999966995637872,3.0), (0.9999965646074228,0.0))
-
-import org.apache.spark.mllib.evaluation.RegressionMetrics
-val validMetrics = new RegressionMetrics(validPredicts)
-validMetrics.rootMeanSquaredError  // 1.2064634209661982
-validMetrics.meanSquaredError      // 1.4555539861294622
-
--------------------------
-
-import org.apache.spark.mllib.linalg.Vectors
-
-val vectors = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  Vectors.dense(arr.slice(0,arr_size-1))
-})
-vectors.cache
+---- Analyzing statistics for standardization ---------------------
 
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
+
+val vectors = data.map{ case LabeledPoint(x,y) => y }
 val matrix = new RowMatrix(vectors)
 val matrixSummary = matrix.computeColumnSummaryStatistics()
 
-println(matrixSummary.mean)
-[54.43894389438945,0.6798679867986799,3.158415841584159,131.68976897689765,246.69306930693077,0.1485148514851485,0.9900990099009899,149.6072607260726,0.32673267326732675,1.0396039603960399,1.6006600660065995,0.6633663366336632,4.722772277227725]
+matrixSummary.max
+res24: org.apache.spark.mllib.linalg.Vector = [77.0,1.0,4.0,200.0,564.0,1.0,2.0,202.0,1.0,6.2,3.0,3.0,7.0]
 
-println(matrixSummary.max)
-[77.0,1.0,4.0,200.0,564.0,1.0,2.0,202.0,1.0,6.2,3.0,3.0,7.0]
+matrixSummary.min
+res25: org.apache.spark.mllib.linalg.Vector = [29.0,0.0,1.0,94.0,126.0,0.0,0.0,71.0,0.0,0.0,1.0,0.0,3.0]
 
-println(matrixSummary.min)
-[29.0,0.0,1.0,94.0,126.0,0.0,0.0,71.0,0.0,0.0,1.0,0.0,3.0]
+matrixSummary.mean
+res13: org.apache.spark.mllib.linalg.Vector = res26: org.apache.spark.mllib.linalg.Vector = [54.43894389438945,0.6798679867986799,3.158415841584159,131.68976897689765,246.69306930693077,0.1485148514851485,0.9900990099009899,149.6072607260726,0.32673267326732675,1.0396039603960399,1.6006600660065995,0.6633663366336632,4.722772277227725]
+
+matrixSummary.variance
+res27: org.apache.spark.mllib.linalg.Vector = [81.69741874849747,0.2183681944353376,0.9218411907415909,309.75112014512706,2680.8491902170376,0.12687692610320636,0.989967870959281,523.265774921863,0.22070683889581014,1.3480952068716803,0.3797346622079425,0.8730575044259389,3.757327388367976]
 
 
------------------------------------
-
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
-
-val data = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  val l = arr(arr_size-1)
-  val f = arr.slice(0,arr_size-1)
-  LabeledPoint(l,Vectors.dense(f))
-})
-
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val trainSet = sets(0)
-val testSet = sets(1)
+---- Apply standardization to dataset -------------------------------
 
 import org.apache.spark.mllib.feature.StandardScaler
 val scaler = new StandardScaler(true, false).fit(trainSet.map(x => x.features))
  
 val trainScaled = trainSet.map(x => LabeledPoint(x.label,scaler.transform(x.features)))
-val validScaled = testSet.map(x => LabeledPoint(x.label, scaler.transform(x.features)))
 
-import org.apache.spark.mllib.regression.LinearRegressionWithSGD
-val alg = new LinearRegressionWithSGD()
-alg.setIntercept(true)
-alg.optimizer.setNumIterations(200)
-alg.optimizer.setStepSize(0.0000000009)
-val model = alg.run(trainScaled)
+---- MLlib Multiclass logistic regression --------------
 
-val validPredicts = validScaled.map(x => (model.predict(x.features),x.label))
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
+val numIterations = 100
+val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainScaled)
 
-validPredicts.take(10)
-res4: Array[(Double, Double)] = Array((0.9999994397819242,0.0), (0.9999993960891147,0.0), (0.9999998853368604,0.0), (1.000000059691792,2.0), (0.9999994832746449,0.0), (0.9999994964108773,1.0), (0.999999807359352,0.0), (0.9999999350185899,0.0), (0.999999537514156,3.0), (0.9999994228067791,0.0))
+val validPredicts = testSet.map(x => (model.predict(scaler.transform(x.features)),x.label))
 
-import org.apache.spark.mllib.evaluation.RegressionMetrics
-val validMetrics = new RegressionMetrics(validPredicts)
-validMetrics.rootMeanSquaredError  // 1.2064638449702823
-validMetrics.meanSquaredError      // 1.455555009220477
+validPredicts.take(20)
+res29: Array[(Double, Double)] = Array((0.0,0.0), (2.0,2.0), (3.0,1.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (2.0,2.0), (0.0,1.0), (0.0,0.0), (3.0,3.0), (2.0,3.0), (0.0,0.0), (0.0,0.0))
 
--------------------------
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
+val metrics = new MulticlassMetrics(validPredicts)
+validPredicts.filter(x => x._1 == x._2).count  // 52
+validPredicts.count                            // 91
+val accuracy = metrics.accuracy   // 0.5360824742268041
+
+metrics.confusionMatrix
+res36: org.apache.spark.mllib.linalg.Matrix =
+43.0  6.0  0.0  1.0  1.0
+10.0  1.0  3.0  2.0  0.0
+0.0   5.0  5.0  2.0  0.0
+1.0   1.0  6.0  3.0  2.0
+0.0   1.0  2.0  2.0  0.0
+
+---- Checked the correlation matrix ---------------------
 
 import org.apache.spark.mllib.linalg.Vectors
-
-val vectors = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  Vectors.dense(arr.slice(0,arr_size))
-})
-vectors.cache
-
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
+
+val vectors = rdd2.map( x => Vectors.dense(x))
+
+vectors.take(5)
+res33: Array[org.apache.spark.mllib.linalg.Vector] = Array([63.0,1.0,1.0,145.0,233.0,1.0,2.0,150.0,0.0,2.3,3.0,0.0,6.0,0.0], [67.0,1.0,4.0,160.0,286.0,0.0,2.0,108.0,1.0,1.5,2.0,3.0,3.0,2.0], [67.0,1.0,4.0,120.0,229.0,0.0,2.0,129.0,1.0,2.6,2.0,2.0,7.0,1.0], [37.0,1.0,3.0,130.0,250.0,0.0,0.0,187.0,0.0,3.5,3.0,0.0,3.0,0.0], [41.0,0.0,2.0,130.0,204.0,0.0,2.0,172.0,0.0,1.4,1.0,0.0,3.0,0.0])
 
 val matrix = new RowMatrix(vectors)
 
@@ -199,104 +184,52 @@ rep.foreach( x => {
                                                                              0.6152 0.6892  num x ca
                                                                                     0.7146  num x thal
 
----------------------------
+---- MLlib Decision tree regression -------------------------
 
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
+val categ_cp = rdd2.map( x => x(2)).distinct.zipWithIndex.collect.toMap
+categ_cp: scala.collection.immutable.Map[Double,Long] = Map(2.0 -> 0, 3.0 -> 1, 1.0 -> 2, 4.0 -> 3)
 
-val data = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  val l = arr(arr_size-1)
-  val f = arr.slice(0,arr_size-1)
-  LabeledPoint(l,Vectors.dense(f))
-})
+val categ_slope = rdd2.map( x => x(10)).distinct.zipWithIndex.collect.toMap
+categ_slope: scala.collection.immutable.Map[Double,Long] = Map(2.0 -> 0, 3.0 -> 1, 1.0 -> 2)
 
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val trainSet = sets(0)
-val testSet = sets(1)
+val categ_thal = rdd2.map( x => x(12)).distinct.zipWithIndex.collect.toMap
+categ_thal: scala.collection.immutable.Map[Double,Long] = Map(6.0 -> 0, 7.0 -> 1, 3.0 -> 2)
 
-import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
-val numIterations = 100
-val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainSet)
+val trainSet_dt = trainSet.map{ case LabeledPoint(x,y) => {
+  val l = x
+  val f = Vectors.dense(y(0),y(1),categ_cp(y(2)),y(3),y(4),y(5),y(6),y(7),y(8),y(9),categ_slope(y(10)),y(11),categ_thal(y(12)))
+  LabeledPoint(l,f)
+}}
 
-val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
+import org.apache.spark.mllib.tree.DecisionTree
+import org.apache.spark.mllib.tree.model.DecisionTreeModel
 
-validPredicts.take(20)
-res0: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,1.0), (0.0,1.0), (3.0,2.0), (0.0,0.0), (2.0,1.0), (0.0,1.0))
+val categoricalFeaturesInfo = Map[Int, Int]( 1 -> 2, 2 -> 4, 5 -> 2, 6 -> 3, 8 -> 2, 10 -> 3, 11 -> 4, 12 -> 3)
 
-import org.apache.spark.mllib.evaluation.MulticlassMetrics
-val metrics = new MulticlassMetrics(validPredicts)
-validPredicts.filter(x => x._1 == x._2).count  // 55
-validPredicts.count                            // 90
-val accuracy = metrics.accuracy   // 0.6111111111111112
+val model = DecisionTree.trainClassifier(trainSet_dt, 5, categoricalFeaturesInfo, "gini", 30, 32)
 
----------------------------
+val testSet_dt = testSet.map{ case LabeledPoint(x,y) => {
+  val l = x
+  val f = Vectors.dense(y(0),y(1),categ_cp(y(2)),y(3),y(4),y(5),y(6),y(7),y(8),y(9),categ_slope(y(10)),y(11),categ_thal(y(12)))
+  LabeledPoint(l,f)
+}}
 
-import org.apache.spark.mllib.feature.StandardScaler
-val scaler = new StandardScaler(true, false).fit(trainSet.map(x => x.features))
- 
-val trainScaled = trainSet.map(x => LabeledPoint(x.label,scaler.transform(x.features)))
-val validScaled = testSet.map(x => LabeledPoint(x.label, scaler.transform(x.features)))
+val validPredicts = testSet_dt.map(x => (model.predict(x.features),x.label))
 
-import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
-val numIterations = 100
-val model = new LogisticRegressionWithLBFGS().setNumClasses(5).run(trainScaled)
-
-val validPredicts = validScaled.map(x => (model.predict(x.features),x.label))
-
-validPredicts.take(20)
-res8: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (4.0,3.0), (0.0,0.0), (3.0,4.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (4.0,1.0), (0.0,1.0), (1.0,2.0), (0.0,0.0), (2.0,1.0), (0.0,1.0))
+scala> validPredicts.take(20)
+res62: Array[(Double, Double)] = Array((0.0,0.0), (3.0,2.0), (4.0,1.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (3.0,3.0), (0.0,0.0), (2.0,4.0), (0.0,0.0), (0.0,0.0), (0.0,0.0), (3.0,0.0), (1.0,2.0), (0.0,1.0), (0.0,0.0), (3.0,3.0), (2.0,3.0), (3.0,0.0), (0.0,0.0))
 
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 val metrics = new MulticlassMetrics(validPredicts)
 validPredicts.filter(x => x._1 == x._2).count  // 50
-validPredicts.count                            // 90
-val accuracy = metrics.accuracy   // 0.5555555555555556
+validPredicts.count                            // 97
+val accuracy = metrics.accuracy   // 0.5154639175257731
 
----------------------------
+metrics.confusionMatrix
+res65: org.apache.spark.mllib.linalg.Matrix =
+38.0  10.0  0.0  3.0  0.0
+7.0   5.0   2.0  1.0  1.0
+2.0   5.0   2.0  2.0  1.0
+1.0   3.0   4.0  5.0  0.0
+0.0   2.0   2.0  1.0  0.0
 
-import org.apache.spark.mllib.linalg.Vectors
-
-val vectors = arr1.map( x => {
-  val arr = x.toArray
-  arr(12) = if (arr(12) == 999999.0) 3.0 else arr(12)
-  arr(11) = if (arr(11) == 999999.0) 0.0 else arr(11)
-  val arr_size = arr.size
-  Vectors.dense(arr.slice(0,arr_size-1))
-})
-vectors.cache
-
-val vect = arr1.map( x => {
-  x(x.size-1) match {
-    case 0 => 0
-    case 1 | 2 => 1
-    case 3 | 4 => 2
-  }
-}).zip(vectors)
-
-import org.apache.spark.mllib.regression.LabeledPoint
-val data = vect.map( x => LabeledPoint(x._1,x._2))
-
-val split_seed = 12345
-val sets = data.randomSplit(Array(0.7,0.3),split_seed)
-val trainSet = sets(0)
-val testSet = sets(1)
-
-import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
-val numIterations = 100
-val model = new LogisticRegressionWithLBFGS().setNumClasses(3).run(trainSet)
-
-val validPredicts = testSet.map(x => (model.predict(x.features),x.label))
-
-validPredicts.take(20)
-res30: Array[(Double, Double)] = Array((0.0,0.0), (0.0,0.0), (0.0,0.0), (1.0,1.0), (0.0,0.0), (0.0,1.0), (0.0,0.0), (0.0,0.0), (1.0,2.0), (0.0,0.0), (2.0,2.0), (0.0,0.0), (0.0,0.0), (1.0,1.0), (0.0,1.0), (0.0,1.0), (1.0,1.0), (0.0,0.0), (1.0,1.0), (0.0,1.0))
-
-import org.apache.spark.mllib.evaluation.MulticlassMetrics
-val metrics = new MulticlassMetrics(validPredicts)
-validPredicts.filter(x => x._1 == x._2).count  // 62
-validPredicts.count                            // 90
-val accuracy = metrics.accuracy   // 0.6888888888888889
