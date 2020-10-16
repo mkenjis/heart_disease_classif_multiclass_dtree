@@ -1,4 +1,4 @@
-# heart_disease_multiclass
+# heart_disease_classif_multiclass_dtree
 heart disease multiclass classification
 - Source : UCI Machine Learning Repository 
 - URL : https://archive.ics.uci.edu/ml/datasets/heart+disease
